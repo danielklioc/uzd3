@@ -25,6 +25,7 @@ vector<string> buffer;
 int minValue;
 int maxValue;
 bool initializeMinMax = true;
+int fileNumber = 1;
 
 bool primeNumber(string myint1);
 vector<string> open_file(const string& file_name);
@@ -73,7 +74,6 @@ bool primeNumber(string myint1)
 void producer()
 {
   string fileName = "rand_files/file";
-  int fileNumber = 1;
   string fileExtension = ".txt";
 
   while (true) 
@@ -119,7 +119,9 @@ void consumer() {
           }
           buffer.pop_back();
       }
-      cout << "Minimum: " << minValue << " Maximum: " << maxValue << "\n";
+      cout<< "Minimum: " << minValue << " Maximum: " << maxValue
+          <<" Files done: " << fileNumber-1 << " Consumer Threads:" << 2 << endl;
+      // cout<< std::this_thread::get_id()<< endl;
     }
   }
 }
@@ -131,9 +133,12 @@ void producerThread() { producer(); }
 int main() 
 {
   thread t1(consumerThread);
-  thread t2(producerThread);
+  thread t2(consumerThread);
+  thread t3(producerThread);
+
   t1.join();
   t2.join();
+  t3.join();
 
   return 0;
 }
