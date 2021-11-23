@@ -7,30 +7,31 @@
 #include <vector>
 #include <string>
 #include <fstream>
-#include <experimental/filesystem>
+#include <algorithm>
 
 using namespace std;
-namespace fs = std::experimental::filesystem;
 
-std::mutex g_mutex;
-std::condition_variable queueEmpty;
+mutex g_mutex;
+condition_variable queueEmpty;
 vector<string> buffer;
-bool read_file = false;
 
-string path = "rand_files/file1.txt";
+// struct result
+// {
+//   int min;
+//   int max;
+// };
+// vector<result> res;
 
-struct result
-{
-  int min;
-  int max;
-};
+int minValue;
+int maxValue;
+bool initializeMinMax = true;
 
-vector<result> res;
+bool primeNumber(string myint1);
+vector<string> open_file(const string& file_name);
+void producer();
+void consumer();
 
-bool g_ready = false;
-int g_data = 0;
-
-std::vector<string> open_file(const string& file_name)
+vector<string> open_file(const string& file_name)
 {
   string new_value;
   vector<string> file_contents;
@@ -44,96 +45,95 @@ std::vector<string> open_file(const string& file_name)
   return file_contents;
 }
 
-void put_string(const string& str)
+bool primeNumber(string myint1)
 {
-
-    buffer.push_back(str);
-}
-
-void producer() {
-  while (true) {
-    vector<string> consumer_data = open_file(path);
-    {
-      std::unique_lock<std::mutex> ul(g_mutex);
-      if( false == read_file)
-      {
-        buffer = consumer_data;
-        read_file = true;
-      }
-      else
-      {
-
-      }
-
-      queueEmpty.notify_all();
-    }
-  }
-
-}
-
-void consumeData(int data) { std::cout << "receive data: " << data << "\n"; }
-
-void consumer() {
-  while (true) {
-    std::string message;
-    {
-      std::unique_lock<std::mutex> ul(g_mutex);
-
-        queueEmpty.wait(ul, [](){
-          return !buffer.empty(); 
-        });
-
-      message = buffer.at(buffer.size()-1);
-      buffer.pop_back();
-
-      for (auto i = buffer.begin(); i != buffer.end(); ++i)
-        cout << *i << " ";
-        buffer.pop_back();
-    }
-    
-    // parse prime numbers and find min max 
-    // cout<<message<<endl;
-  }
-}
-
-void primeNumber(string i,int n)
-{
-  int myint1 = stoi(i);
+  int n = stoi(myint1);
   bool isPrime = true;
 
-    cout << "Enter a positive integer: ";
-    cin >> n;
-
     // 0 and 1 are not prime numbers
-    if (n == 0 || n == 1) {
+    if (n == 0 || n == 1) 
+    {
         isPrime = false;
     }
-    else {
-        for (i = 2; i <= n / 2; ++i) {
-            if (n % i == 0) {
+    else 
+    {
+        for (int i = 2; i <= n / 2; ++i) 
+        {
+            if (n % i == 0) 
+            {
                 isPrime = false;
                 break;
             }
         }
     }
-    if (isPrime)
-        cout << n << " is a prime number";
-    else
-        cout << n << " is not a prime number";
+
+  return isPrime;
 }
 
+void producer()
+{
+  string fileName = "rand_files/file";
+  int fileNumber = 1;
+  string fileExtension = ".txt";
+
+  while (true) 
+  {
+    string path = fileName + to_string(fileNumber) + fileExtension ;
+    vector<string> consumer_data = open_file(path);
+    {
+      unique_lock<mutex> ul(g_mutex);
+      buffer = consumer_data;
+
+      queueEmpty.notify_all();
+    }
+    fileNumber++;
+  }
+}
+
+void consumeData(int data) { cout << "receive data: " << data << "\n"; }
+
+void consumer() {
+    string number;
+    vector<string> consumerBuffer;
+    while (true) {
+    {
+      unique_lock<mutex> ul(g_mutex);
+
+      queueEmpty.wait(ul, [](){ return !buffer.empty(); });
+
+      while(!buffer.empty())
+      {
+          number = buffer.at(buffer.size()-1);
+          if( initializeMinMax)
+          {
+              minValue = stoi( number );
+              maxValue = stoi( number );
+              initializeMinMax = false;
+          }
+          if( primeNumber(number) )
+          {
+              int n = stoi(number);
+              auto pairSeq= std::minmax({ n, minValue, maxValue});
+              minValue = pairSeq.first;
+              maxValue = pairSeq.second;
+          }
+          buffer.pop_back();
+      }
+      cout << "Minimum: " << minValue << " Maximum: " << maxValue << "\n";
+    }
+  }
+}
 
 void consumerThread() { consumer(); }
 
 void producerThread() { producer(); }
 
-int main() {
-
-  fs::path pathToShow(/* ... */);
-
-  std::thread t1(consumerThread);
-  std::thread t2(producerThread);
+int main() 
+{
+  thread t1(consumerThread);
+  thread t2(producerThread);
   t1.join();
   t2.join();
+
   return 0;
 }
